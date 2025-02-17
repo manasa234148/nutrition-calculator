@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nutrition Calculator</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #ecf0f1;
+            --accent-color: #3498db;
+        }
+
+        .light-theme {
+            --bg-color: #ffffff;
+            --text-color: #2c3e50;
+            --card-bg: #f5f6fa;
+        }
+
+        .dark-theme {
+            --bg-color: #2c3e50;
+            --text-color: #ecf0f1;
+            --card-bg: #34495e;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: all 0.3s ease;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .search-section {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+        }
+
+        #searchFood {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid var(--accent-color);
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        #searchFood::placeholder {
+            color: #bdc3c7;
+        }
+
+        #calculateBtn {
+            padding: 12px 24px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        #calculateBtn:hover {
+            background-color: #2980b9;
+        }
+
+        .results-section {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+            margin: 20px 0;
+            padding: 20px;
+            background-color: var(--card-bg);
+            border-radius: 10px;
+        }
+
+        #foodImage img {
+            max-width: 100%;
+            border-radius: 5px;
+        }
+
+        .meal-plan-section {
+            background-color: var(--card-bg);
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+        }
+
+        #themeToggle {
+            padding: 10px 20px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .day-plan {
+            background-color: var(--bg-color);
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .meals {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+
+        .meal {
+            padding: 10px;
+            background-color: var(--card-bg);
+            border-radius: 5px;
+        }
+
+        #nutritionInfo ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        #nutritionInfo li {
+            margin: 10px 0;
+            padding: 8px;
+            background-color: var(--bg-color);
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body class="light-theme">
+    <div class="theme-toggle">
+        <button id="themeToggle">Toggle Theme</button>
+    </div>
+
+    <div class="container">
+        <h1>Nutrition Calculator</h1>
+        
+        <div class="search-section">
+            <input type="text" id="searchFood" placeholder="Search for food items...">
+            <button id="calculateBtn">Calculate</button>
+        </div>
+
+        <div class="results-section">
+            <div id="foodImage"></div>
+            <div id="nutritionInfo">
+                <h2>Nutrition Information</h2>
+                <ul>
+                    <li>Proteins: <span id="proteins">0</span>g</li>
+                    <li>Calories: <span id="calories">0</span>kcal</li>
+                    <li>Fats: <span id="fats">0</span>g</li>
+                    <li>Vitamins: <span id="vitamins">0</span>mg</li>
+                    <li>Carbohydrates: <span id="carbs">0</span>g</li>
+                    <li>Minerals: <span id="minerals">0</span>mg</li>
+                    <li>Fiber: <span id="fiber">0</span>g</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="meal-plan-section">
+            <h2>Weekly Meal Plan</h2>
+            <div id="mealPlan"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = 'SigHa0uC77K5GDbx3aw3habFyrW1GP9V0eXRJnT0';
+        const API_URL = 'https://api.nal.usda.gov/fdc/v1';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const searchInput = document.getElementById('searchFood');
+            const calculateBtn = document.getElementById('calculateBtn');
+            const themeToggle = document.getElementById('themeToggle');
+
+            // Theme Toggle
+            themeToggle.addEventListener('click', () => {
+                document.body.classList.toggle('dark-theme');
+                document.body.classList.toggle('light-theme');
+            });
+
+            // Search Food
+            searchInput.addEventListener('input', async (e) => {
+                const searchTerm = e.target.value;
+                if (searchTerm.length > 2) {
+                    const foods = await searchFoods(searchTerm);
+                    displaySearchResults(foods);
+                }
+            });
+
+            // Calculate Nutrition
+            calculateBtn.addEventListener('click', async () => {
+                const foodItem = searchInput.value;
+                const nutritionData = await getNutritionData(foodItem);
+                displayNutritionInfo(nutritionData);
+            });
+
+            // Generate Initial Meal Plan
+            generateWeeklyMealPlan();
+        });
+
+        async function searchFoods(query) {
+            try {
+                const response = await fetch(`${API_URL}/foods/search?api_key=${API_KEY}&query=${query}`);
+                const data = await response.json();
+                return data.foods;
+            } catch (error) {
+                console.error('Error searching foods:', error);
+                return [];
+            }
+        }
+
+        async function getNutritionData(foodItem) {
+            try {
+                const foods = await searchFoods(foodItem);
+                if (foods.length > 0) {
+                    const foodId = foods[0].fdcId;
+                    const response = await fetch(`${API_URL}/food/${foodId}?api_key=${API_KEY}`);
+                    return await response.json();
+                }
+            } catch (error) {
+                console.error('Error getting nutrition data:', error);
+            }
+        }
+
+        function displayNutritionInfo(data) {
+            if (!data) return;
+
+            // Update nutrition values
+            document.getElementById('proteins').textContent = getNutrientValue(data, 'Protein');
+            document.getElementById('calories').textContent = getNutrientValue(data, 'Energy');
+            document.getElementById('fats').textContent = getNutrientValue(data, 'Total lipid (fat)');
+            document.getElementById('carbs').textContent = getNutrientValue(data, 'Carbohydrate, by difference');
+            document.getElementById('fiber').textContent = getNutrientValue(data, 'Fiber, total dietary');
+            
+            // Display food image if available
+            if (data.foodImages && data.foodImages.length > 0) {
+                document.getElementById('foodImage').innerHTML = `
+                    <img src="${data.foodImages[0]}" alt="${data.description}">
+                `;
+            }
+        }
+
+        function getNutrientValue(data, nutrientName) {
+            const nutrient = data.foodNutrients.find(n => n.nutrient.name === nutrientName);
+            return nutrient ? nutrient.amount.toFixed(2) : '0';
+        }
+
+        function generateWeeklyMealPlan() {
+            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            const mealPlanContainer = document.getElementById('mealPlan');
+            const currentDate = new Date();
+            
+            let mealPlanHTML = '';
+            days.forEach((day, index) => {
+                const date = new Date(currentDate);
+                date.setDate(currentDate.getDate() + index);
+                
+                mealPlanHTML += `
+                    <div class="day-plan">
+                        <h3>${day} - ${date.toLocaleDateString()}</h3>
+                        <div class="meals">
+                            <div class="meal">
+                                <h4>Breakfast</h4>
+                                ${getRandomMeal('breakfast')}
+                            </div>
+                            <div class="meal">
+                                <h4>Lunch</h4>
+                                ${getRandomMeal('lunch')}
+                            </div>
+                            <div class="meal">
+                                <h4>Dinner</h4>
+                                ${getRandomMeal('dinner')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            mealPlanContainer.innerHTML = mealPlanHTML;
+        }
+
+        function getRandomMeal(mealType) {
+            const meals = {
+                breakfast: [
+                    'Oatmeal with fruits and nuts',
+                    'Eggs and whole grain toast',
+                    'Greek yogurt parfait',
+                    'Smoothie bowl',
+                    'Whole grain pancakes',
+                    'Avocado toast with poached eggs',
+                    'Chia seed pudding'
+                ],
+                lunch: [
+                    'Grilled chicken salad',
+                    'Quinoa bowl with vegetables',
+                    'Turkey and avocado sandwich',
+                    'Lentil soup with bread',
+                    'Mediterranean wrap',
+                    'Tuna nicoise salad',
+                    'Buddha bowl'
+                ],
+                dinner: [
+                    'Salmon with roasted vegetables',
+                    'Lean beef stir-fry',
+                    'Vegetarian curry with rice',
+                    'Baked chicken with sweet potato',
+                    'Fish tacos with slaw',
+                    'Grilled tofu with quinoa',
+                    'Shrimp and vegetable skewers'
+                ]
+            };
+            
+            return meals[mealType][Math.floor(Math.random() * meals[mealType].length)];
+        }
+    </script>
+</body>
+</html>
